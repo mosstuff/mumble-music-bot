@@ -13,7 +13,7 @@ CERTFILE = "testbot.pem"
 mumble = Mumble(SERVER, USERNAME, password=PASSWORD, port=PORT, certfile=CERTFILE, reconnect=True)
 mumble.start()
 mumble.is_ready()
-jellyfin.make_music("Glowing Lights")
+jellyfin.make_music("Love Cabin")
 data, samplerate = sf.read("current.wav", dtype="int16")
 
 if data.ndim > 1:

@@ -23,5 +23,5 @@ def make_music(Name):
         "current.wav",
         acodec='pcm_s16le',
         ar='48000',
-        ac=2
-    ).run()
+        ac=2,
+    ).run(overwrite_output=True)
