@@ -2,6 +2,7 @@ import numpy as np
 import soundfile as sf
 import time
 from mumble import Mumble
+import jellyfin
 
 SERVER = "157.180.10.100"
 PORT = 3001
@@ -12,8 +13,8 @@ CERTFILE = "testbot.pem"
 mumble = Mumble(SERVER, USERNAME, password=PASSWORD, port=PORT, certfile=CERTFILE, reconnect=True)
 mumble.start()
 mumble.is_ready()
-
-data, samplerate = sf.read("output.wav", dtype="int16")
+jellyfin.make_music("Glowing Lights")
+data, samplerate = sf.read("current.wav", dtype="int16")
 
 if data.ndim > 1:
     data = np.mean(data, axis=1).astype(np.int16)
