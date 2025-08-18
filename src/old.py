@@ -17,11 +17,11 @@ def load_array(filename=datafile):
     return []  # Return empty list if file doesn't exist
 
 # Configuration
-SERVER = "172.18.0.2"
+SERVER = "157.180.10.100"
 PORT = 3001  # Default Mumble port
-USERNAME = "TosBot"
+USERNAME = "Stählampe"
 PASSWORD = ""  # Leave empty if no password
-CERTFILE = 'cert.pem'  # Path to your certificate file
+CERTFILE = 'testbot.pem'  # Path to your certificate file
 currentusers = {}
 accepted = load_array()
 
