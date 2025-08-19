@@ -1,8 +1,11 @@
 from jellyfin_apiclient_python import JellyfinClient
 import ffmpeg
 import requests
+import asyncio
+import ffmpeg_wrap
 
-def make_music(Name):
+def query(Name):
+    print("Quering: " + Name)
     client = JellyfinClient()
     client.config.app('music-bot', '0.0.1', 'scary_big_nasa_compuper', 'ghdfjklhhdfghklfghnijophrsthijkophtrsopihjdfgh')
     client.config.data["auth.ssl"] = True
@@ -11,17 +14,24 @@ def make_music(Name):
     result = client.jellyfin.search_media_items(term=Name, media="Music")
     id = result["Items"][0]["Id"]
     container = result["Items"][0]["Container"]
+    name_artist = result["Items"][0]["Name"] + " by " + ' ,'.join(result["Items"][0]["Artists"])
     url = client.jellyfin.audio_url(id,container)
+    print("Found: " + name_artist + ".")
+    return container, name_artist, url
+
+
+async def download(url, container):
     response = requests.get(url)
     if response.status_code == 200:
-        with open("current." + container, 'wb') as f:
+        with open("jellyfin." + container, 'wb') as f:
             f.write(response.content)
+            return("jellyfin." + container)
     else:
         print("Failed:", response.status_code)
+        return("")
 
-    ffmpeg.input("current.mp3").output(
-        "current.wav",
-        acodec='pcm_s16le',
-        ar='48000',
-        ac=2,
-    ).run(overwrite_output=True)
+async def download_music_and_convert(url, container):
+    file = await download(url, container)
+    print("Downloaded. Started conversion to WAV.")
+    await ffmpeg_wrap.convert_proper(file)
+    print("Finished converting. Music ready.")
