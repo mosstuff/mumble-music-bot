@@ -1,2 +1,2 @@
-# mumble-music-bot
+# Stählampe
 okaaay, lets go
