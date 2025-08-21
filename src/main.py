@@ -62,7 +62,7 @@ def process_text(data):
                 asyncio.run_coroutine_threadsafe(play_immedeatly(query), loop)
 
             case "add":
-                mumble.channels[0].send_text_message("Added.")
+                mumble.channels[0].send_text_message("Processing...")
                 query = data.message[5:]
                 asyncio.run_coroutine_threadsafe(add_queue(query), loop)
 
@@ -217,9 +217,14 @@ async def play_url(url):
 
 async def add_queue(query):
     global queue, is_processing_queue
-    queue.append(query)
-    if not is_processing_queue:
-        asyncio.create_task(process_queue())
+    container, name, url = jellyfin.query(query)
+    if name != "":
+        queue.append(query)
+        mumble.channels[0].send_text_message("Added " + name + " to queue!")
+        if not is_processing_queue:
+            asyncio.create_task(process_queue())
+    else:
+        mumble.channels[0].send_text_message("Song not Found!")
 
 async def play_immedeatly(query):
     global queue
