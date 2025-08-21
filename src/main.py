@@ -10,7 +10,7 @@ import asyncio
 import re
 
 # --- Configuration ---
-SERVER = "157.180.10.100"
+SERVER = "26cbca8d-e19a-483b-b99f-d8451f462e29"
 PORT = 3001
 USERNAME = "Stählampe"
 PASSWORD = ""
