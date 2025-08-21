@@ -218,6 +218,8 @@ async def play_url(url):
 async def add_queue(query):
     global queue, is_processing_queue
 
+    query = re.sub(r'<[^>]+>', '', query)
+
     if query.startswith("https://"):
         queue.append({"type":"url","data":query})
         mumble.channels[0].send_text_message("Added " + query + " to queue!")
