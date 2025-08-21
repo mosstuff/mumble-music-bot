@@ -80,7 +80,7 @@ def process_text(data):
                 asyncio.run_coroutine_threadsafe(skip_queue(), loop)
 
             case "list":
-                mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(queue))
+                mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(item["data"] for item in queue))
                 #asyncio.run_coroutine_threadsafe(chat_threadsfe(str(queue)), loop)
 
             case "songs":
