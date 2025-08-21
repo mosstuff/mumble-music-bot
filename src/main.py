@@ -282,6 +282,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
+        print("Mumble Bot is running...")
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Shutting down.")
