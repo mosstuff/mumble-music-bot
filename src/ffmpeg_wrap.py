@@ -8,14 +8,15 @@ async def convert_proper(file):
             acodec='pcm_s16le',
             ar='48000',
             ac=2,
-            loglevel="quiet"
+            af = 'loudnorm'
+#            loglevel="quiet"
         ).run(overwrite_output=True)
     await asyncio.to_thread(run_ffmpeg)
 
-def make_intermission():
+async def make_intermission():
     print("Merging intermission...")
     ffmpeg.concat(
-        ffmpeg.input("intermission.wav"),
+        ffmpeg.input("intermission2.wav"),
         ffmpeg.input("tts.mp3"),
         v=0,  # no video
         a=1   # audio only
@@ -24,5 +25,6 @@ def make_intermission():
         acodec='pcm_s16le',
         ar=48000,
         ac=2,
-        loglevel="quiet"
+#        loglevel="quiet"
     ).run(overwrite_output=True)
+    print("Finished Merging.")

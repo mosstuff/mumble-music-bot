@@ -1,6 +1,6 @@
 from jellyfin_apiclient_python import JellyfinClient
 import ffmpeg
-import requests
+import aiohttp
 import asyncio
 import ffmpeg_wrap
 
@@ -12,6 +12,7 @@ def query(Name):
     client.auth.connect_to_address('https://crapflix.mosstuff.de/https://crapflix.mosstuff.de')
     client.auth.login('https://crapflix.mosstuff.de/https://crapflix.mosstuff.de', 'music-bot', 'musik')
     result = client.jellyfin.search_media_items(term=Name, media="Music")
+    print(result)
     if len(result["Items"]) >= 1:
         id = result["Items"][0]["Id"]
         container = result["Items"][0]["Container"]
@@ -24,14 +25,17 @@ def query(Name):
 
 
 async def download(url, container):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open("jellyfin." + container, 'wb') as f:
-            f.write(response.content)
-            return("jellyfin." + container)
-    else:
-        print("Failed:", response.status_code)
-        return("")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                content = await response.read()
+                with open("jellyfin." + container, 'wb') as f:
+                    f.write(content)
+                    return "jellyfin." + container
+            else:
+                print("Failed:", response.status)
+                return ""
+
 
 async def download_music_and_convert(url, container):
     print("Downloading: " + url)
