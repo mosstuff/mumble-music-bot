@@ -5,7 +5,7 @@ import asyncio
 import ffmpeg_wrap
 
 def query(Name):
-    print("Quering: " + Name)
+    print("[Jellyfin] Quering: " + Name)
     client = JellyfinClient()
     client.config.app('music-bot', '0.0.1', 'scary_big_nasa_compuper', 'ghdfjklhhdfghklfghnijophrsthijkophtrsopihjdfgh')
     client.config.data["auth.ssl"] = True
@@ -18,7 +18,7 @@ def query(Name):
         container = result["Items"][0]["Container"]
         name_artist = result["Items"][0]["Name"] + " by " + ' ,'.join(result["Items"][0]["Artists"])
         url = client.jellyfin.audio_url(id,container)
-        print("Found: " + name_artist + ".")
+        print("[Jellyfin] Found: " + name_artist + ".")
         return container, name_artist, url
     else:
         return("","","")
@@ -33,13 +33,13 @@ async def download(url, container):
                     f.write(content)
                     return "jellyfin." + container
             else:
-                print("Failed:", response.status)
+                print("[Downloader] Failed:", response.status)
                 return ""
 
 
 async def download_music_and_convert(url, container):
-    print("Downloading: " + url)
+    print("[DnC] Downloading: " + url)
     file = await download(url, container)
-    print("Downloaded. Started conversion to WAV.")
+    print("[DnC] Downloaded. Started conversion to WAV.")
     await ffmpeg_wrap.convert_proper(file)
-    print("Finished converting. Music ready.")
+    print("[DnC] Finished converting. Music ready.")

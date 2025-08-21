@@ -9,39 +9,31 @@ import ffmpeg_wrap
 import asyncio
 import re
 
-# --- Configuration ---
 SERVER = "26cbca8d-e19a-483b-b99f-d8451f462e29"
 PORT = 3001
 USERNAME = "Stählampe"
 PASSWORD = ""
 CERTFILE = "testbot.pem"
 
-# --- Global State ---
 queue = []
 is_processing_queue = False
 is_playing = False
 stop_event = asyncio.Event()
 
-# --- Mumble Setup ---
 mumble = Mumble(SERVER, USERNAME, password=PASSWORD, port=PORT, certfile=CERTFILE, reconnect=True)
 
-# This will hold the main event loop
 loop = None
 
 currentusers = {}
 
-# --- Async Helper for Thread-Safe Greeting ---
 async def greet_user(username):
     """Asynchronously sends a welcome message."""
-    # This coroutine will be run safely on the main event loop
     stop_event.clear()
     await play_file(username + ".wav")
     mumble.channels[0].send_text_message(f"Hiya, {username}")
 
 async def chat_threadsfe(msg):
     mumble.channels[0].send_text_message(msg)
-
-# --- Synchronous Callbacks (from pymumble's thread) ---
 
 def process_text(data):
     """
@@ -50,7 +42,7 @@ def process_text(data):
     """
     global loop
     if not loop:
-        return # Don't process commands if the main loop isn't running yet
+        return
 
     if data.message.startswith("!"):
         command = data.message[1:].split()[0]
@@ -91,50 +83,35 @@ def process_text(data):
                 mumble.channels[0].send_text_message(message)
 
 def process_join(data):
-    """
-    Handles user join events.
-    Runs in pymumble's background thread.
-    """
     global loop
     if not loop:
-        return # Don't process commands if the main loop isn't running yet
+        return
 
     username = data.get('name')
     session = data.get('session')
     
     if username and session:
         currentusers[session] = username
-        # **CRITICAL FIX**: Schedule the message on the main loop
-        # Do NOT call mumble.send_text_message() directly here.
         asyncio.run_coroutine_threadsafe(stop_queue(), loop)
         asyncio.run_coroutine_threadsafe(greet_user(username), loop)
 
 def process_leave(user, data):
-    """
-    Handles user leave events.
-    Runs in pymumble's background thread.
-    """
-    # This function is fine because it only modifies a dictionary, 
-    # which is a thread-safe operation in this context (thanks to Python's GIL).
-    # It does not interact with the mumble object or network.
     try:
         session = user.get('session')
         if session and session in currentusers:
             currentusers.pop(session)
     except Exception as e:
-        print(f"Error in process_leave: {e}")
-
-# --- Asynchronous Playback Logic (Unchanged) ---
+        print(f"[Main] Error in process_leave: {e}")
 
 async def play_file(file):
     global is_playing
     is_playing = True
-    print(f"Now playing: {file}")
+    print(f"[Player] Now playing: {file}")
     
     try:
         data, samplerate = sf.read(file, dtype="int16")
     except Exception as e:
-        print(f"Error reading audio file {file}: {e}")
+        print(f"[Player] Error reading audio file {file}: {e}")
         is_playing = False
         return
 
@@ -147,7 +124,7 @@ async def play_file(file):
             data = librosa.resample(data.astype(np.float32), orig_sr=samplerate, target_sr=48000)
             data = data.astype(np.int16)
         except ImportError:
-            print("librosa not installed. Could not resample audio.")
+            print("[Player] librosa not installed. Could not resample audio.")
             is_playing = False
             return
 
@@ -157,23 +134,23 @@ async def play_file(file):
 
     for i in range(0, len(pcm_bytes), chunk_size):
         if stop_event.is_set():
-            print("Playback stopped early.")
+            print("[Player] Playback stopped early.")
             break
         
         chunk = pcm_bytes[i:i+chunk_size]
         mumble.send_audio.add_sound(chunk)
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=seconds_per_iteration)
-            print("Playback stopped early during sleep.")
+            print("[Player] Playback stopped early during sleep.")
             break
         except asyncio.TimeoutError:
             pass
             
     is_playing = False
-    print("Finished playing audio.")
+    print("[Player] Finished playing audio.")
 
 async def play_query(query):
-    print(f"Processing query: {query}")
+    print(f"[Queryplay] Processing query: {query}")
     stop_event.clear()
 
     container, name_artist, url = jellyfin.query(query)
@@ -195,7 +172,7 @@ async def play_query(query):
         return "Error! Song not found!"
 
 async def play_url(url):
-    print(f"Processing url: {url}")
+    print(f"[URLplay] Processing url: {url}")
     url = re.sub(r'<[^>]+>', '', url)
     stop_event.clear()
 
@@ -265,7 +242,7 @@ async def process_queue():
                 mumble.channels[0].send_text_message(result)
 
     is_processing_queue = False
-    print("Queue finished.")
+    print("[Queue] Queue finished.")
 
 async def stop_queue():
     global queue, is_processing_queue
@@ -284,7 +261,6 @@ async def skip_queue():
     stop_event.set()
     stop_event.clear()
     asyncio.create_task(process_queue())
-# --- Main Application Entry Point ---
 
 async def main():
     global loop
@@ -297,8 +273,6 @@ async def main():
     
     while not mumble.is_ready():
         await asyncio.sleep(0.1)
-        
-    print("Startup complete. Bot is ready.")
     
     await asyncio.Event().wait()
 
@@ -307,4 +281,4 @@ if __name__ == "__main__":
         print("Mumble Bot is running...")
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Shutting down.")
+        print("[Main] Shutting down.")
