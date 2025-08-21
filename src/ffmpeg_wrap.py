@@ -8,8 +8,8 @@ async def convert_proper(file):
             acodec='pcm_s16le',
             ar='48000',
             ac=2,
-            af = 'loudnorm'
-#            loglevel="quiet"
+            af = 'loudnorm',
+            loglevel="quiet"
         ).run(overwrite_output=True)
     await asyncio.to_thread(run_ffmpeg)
 
@@ -25,6 +25,6 @@ async def make_intermission():
         acodec='pcm_s16le',
         ar=48000,
         ac=2,
-#        loglevel="quiet"
+        loglevel="quiet"
     ).run(overwrite_output=True)
     print("Finished Merging.")

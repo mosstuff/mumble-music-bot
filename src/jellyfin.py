@@ -12,7 +12,7 @@ def query(Name):
     client.auth.connect_to_address('https://crapflix.mosstuff.de/https://crapflix.mosstuff.de')
     client.auth.login('https://crapflix.mosstuff.de/https://crapflix.mosstuff.de', 'music-bot', 'musik')
     result = client.jellyfin.search_media_items(term=Name, media="Music")
-    print(result)
+    #print(result)
     if len(result["Items"]) >= 1:
         id = result["Items"][0]["Id"]
         container = result["Items"][0]["Container"]

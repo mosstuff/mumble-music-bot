@@ -217,28 +217,33 @@ async def play_url(url):
 
 async def add_queue(query):
     global queue, is_processing_queue
-    container, name, url = jellyfin.query(query)
-    if name != "":
-        queue.append(query)
-        mumble.channels[0].send_text_message("Added " + name + " to queue!")
+
+    if query.startswith("https://"):
+        queue.append({"type":"url","data":query})
+        mumble.channels[0].send_text_message("Added " + query + " to queue!")
         if not is_processing_queue:
             asyncio.create_task(process_queue())
     else:
-        mumble.channels[0].send_text_message("Song not Found!")
+        container, name, url = jellyfin.query(query)
+        if name != "":
+            queue.append({"type":"query","data":query})
+            mumble.channels[0].send_text_message("Added " + name + " to queue!")
+            if not is_processing_queue:
+                asyncio.create_task(process_queue())
+        else:
+            mumble.channels[0].send_text_message("Song not Found!")
 
 async def play_immedeatly(query):
     global queue
-    await stop_queue()
-    queue.insert(0, query)
+    await stop_queue_no_clear()
+    queue.insert(0, {"type":"query","data":query})
     asyncio.create_task(process_queue())
 
 async def play_url_immedeatly(url):
     global queue
-    await stop_queue()
-    result = await play_url(url)
-    if result:
-            mumble.channels[0].send_text_message(result)
-
+    await stop_queue_no_clear()
+    queue.insert(0, {"type":"url","data":query})
+    asyncio.create_task(process_queue())
 
 async def process_queue():
     global queue, is_processing_queue
@@ -248,16 +253,26 @@ async def process_queue():
     is_processing_queue = True
     while queue and is_processing_queue:
         current_query = queue.pop(0)
-        result = await play_query(current_query)
-        if result:
-             mumble.channels[0].send_text_message(result)
+        if current_query.get("type") == "query":
+            result = await play_query(current_query.get("data"))
+            if result:
+                mumble.channels[0].send_text_message(result)
+        elif current_query.get("type") == "url":
+            result = await play_url(current_query.get("data"))
+            if result:
+                mumble.channels[0].send_text_message(result)
 
     is_processing_queue = False
     print("Queue finished.")
 
 async def stop_queue():
-    global queue, is_processing_queue, is_playing
+    global queue, is_processing_queue
     queue.clear()
+    is_processing_queue = False
+    stop_event.set()
+
+async def stop_queue_no_clear():
+    global is_processing_queue
     is_processing_queue = False
     stop_event.set()
     
