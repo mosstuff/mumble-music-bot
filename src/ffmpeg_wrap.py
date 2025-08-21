@@ -17,7 +17,7 @@ async def make_intermission():
     print("Merging intermission...")
     ffmpeg.concat(
         ffmpeg.input("intermission2.wav"),
-        ffmpeg.input("tts.mp3"),
+        ffmpeg.input("tts.wav"),
         v=0,  # no video
         a=1   # audio only
     ).output(
