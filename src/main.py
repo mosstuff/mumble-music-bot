@@ -27,7 +27,6 @@ loop = None
 currentusers = {}
 
 async def greet_user(username):
-    """Asynchronously sends a welcome message."""
     stop_event.clear()
     await play_file(username + ".wav")
     mumble.channels[0].send_text_message(f"Hiya, {username}")
@@ -36,10 +35,6 @@ async def chat_threadsfe(msg):
     mumble.channels[0].send_text_message(msg)
 
 def process_text(data):
-    """
-    Handles command messages from Mumble.
-    Runs in pymumble's background thread.
-    """
     global loop
     if not loop:
         return
@@ -221,7 +216,7 @@ async def play_immedeatly(query):
 async def play_url_immedeatly(url):
     global queue
     await stop_queue_no_clear()
-    queue.insert(0, {"type":"url","data":query})
+    queue.insert(0, {"type":"url","data":url})
     asyncio.create_task(process_queue())
 
 async def process_queue():

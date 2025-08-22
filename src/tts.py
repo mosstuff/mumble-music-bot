@@ -10,5 +10,4 @@ async def say_thing(text):
     with wave.open("tts.wav", "wb") as wav_file:
         voice.synthesize_wav(text, wav_file)
 
-
     print(f"[TTS] Saved synthesized speech to: {output_path}")
