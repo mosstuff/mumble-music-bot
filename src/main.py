@@ -12,7 +12,7 @@ import re
 # --- Configuration ---
 SERVER = "157.180.10.100"
 PORT = 3001
-USERNAME = "Stählampe"
+USERNAME = "stehendes Beleuchtungsinstrument"
 PASSWORD = ""
 CERTFILE = "testbot.pem"
 
@@ -20,6 +20,7 @@ CERTFILE = "testbot.pem"
 queue = []
 is_processing_queue = False
 is_playing = False
+looping = False  # New state for looping the queue
 stop_event = asyncio.Event()
 
 # --- Mumble Setup ---
@@ -53,7 +54,8 @@ def process_text(data):
         return # Don't process commands if the main loop isn't running yet
 
     if data.message.startswith("!"):
-        command = data.message[1:].split()[0]
+        command_parts = data.message[1:].split()
+        command = command_parts[0]
         
         match command:
             case "play":
@@ -78,16 +80,46 @@ def process_text(data):
             case "skip":
                 mumble.channels[0].send_text_message("Skipped.")
                 asyncio.run_coroutine_threadsafe(skip_queue(), loop)
-
+            case "fckmuters":
+                mumble.channels[0].send_text_message("!accept")
             case "list":
                 mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(queue))
-                #asyncio.run_coroutine_threadsafe(chat_threadsfe(str(queue)), loop)
-
+    
             case "songs":
                 mumble.channels[0].send_text_message("<a href=\"https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html\">https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html</a>")
             
+            case "loop":
+                global looping
+                try:
+                    arg = command_parts[1].lower()
+                    if arg == "true":
+                        looping = True
+                        mumble.channels[0].send_text_message("Looping enabled.")
+                    elif arg == "false":
+                        looping = False
+                        mumble.channels[0].send_text_message("Looping disabled.")
+                    else:
+                        mumble.channels[0].send_text_message("Usage: !loop <true|false>")
+                except IndexError:
+                    # If no argument is provided, report the current state
+                    status = "enabled" if looping else "disabled"
+                    mumble.channels[0].send_text_message(f"Looping is currently {status}.")
+
             case "help":
-                message = f"<h1>Stehlampe -- Help</h1><br><ul><li>!play <i>query</i> -- Plays a song immediately.</li><li>!add <i>query</i> -- Adds a song to the queue.</li><li>!stop -- Stops playback and clears the queue.</li><li>!help -- Shows this message.</li></ul>"
+                message = (
+                    "<h1>Stehlampe -- Help</h1><br>"
+                    "<ul>"
+                    "<li><b>!play <i>query</i></b> -- Plays a song immediately, clearing the queue.</li>"
+                    "<li><b>!add <i>query</i></b> -- Adds a song to the queue.</li>"
+                    "<li><b>!url <i>URL</i></b> -- Plays a direct URL immediately.</li>"
+                    "<li><b>!stop</b> -- Stops playback and clears the queue.</li>"
+                    "<li><b>!skip</b> -- Skips the current song.</li>"
+                    "<li><b>!list</b> -- Shows the songs currently in the queue.</li>"
+                    "<li><b>!loop <i>true|false</i></b> -- Enables or disables playlist looping.</li>"
+                    "<li><b>!songs</b> -- Links to the Jellyfin library.</li>"
+                    "<li><b>!help</b> -- Shows this message.</li>"
+                    "</ul>"
+                )
                 mumble.channels[0].send_text_message(message)
 
 def process_join(data):
@@ -97,15 +129,13 @@ def process_join(data):
     """
     global loop
     if not loop:
-        return # Don't process commands if the main loop isn't running yet
+        return
 
     username = data.get('name')
     session = data.get('session')
     
     if username and session:
         currentusers[session] = username
-        # **CRITICAL FIX**: Schedule the message on the main loop
-        # Do NOT call mumble.send_text_message() directly here.
         asyncio.run_coroutine_threadsafe(stop_queue(), loop)
         asyncio.run_coroutine_threadsafe(greet_user(username), loop)
 
@@ -114,9 +144,6 @@ def process_leave(user, data):
     Handles user leave events.
     Runs in pymumble's background thread.
     """
-    # This function is fine because it only modifies a dictionary, 
-    # which is a thread-safe operation in this context (thanks to Python's GIL).
-    # It does not interact with the mumble object or network.
     try:
         session = user.get('session')
         if session and session in currentusers:
@@ -124,7 +151,7 @@ def process_leave(user, data):
     except Exception as e:
         print(f"Error in process_leave: {e}")
 
-# --- Asynchronous Playback Logic (Unchanged) ---
+# --- Asynchronous Playback Logic ---
 
 async def play_file(file):
     global is_playing
@@ -234,34 +261,42 @@ async def play_url_immedeatly(url):
     if result:
             mumble.channels[0].send_text_message(result)
 
-
 async def process_queue():
-    global queue, is_processing_queue
+    global queue, is_processing_queue, looping
     if is_processing_queue:
         return
     
     is_processing_queue = True
     while queue and is_processing_queue:
         current_query = queue.pop(0)
+        
+        # If looping is enabled, add the song back to the end of the queue
+        if looping:
+            queue.append(current_query)
+
         result = await play_query(current_query)
         if result:
              mumble.channels[0].send_text_message(result)
+             # If song failed and we are looping, remove the re-added song
+             if looping:
+                 queue.pop()
+
 
     is_processing_queue = False
     print("Queue finished.")
 
 async def stop_queue():
-    global queue, is_processing_queue, is_playing
+    global queue, is_processing_queue, is_playing, looping
     queue.clear()
     is_processing_queue = False
+    looping = False  # Also reset looping when stopping
     stop_event.set()
     
 async def skip_queue():
     global queue, is_processing_queue
-    is_processing_queue = False
+    # Simply stop the current song. The process_queue loop will continue.
     stop_event.set()
-    stop_event.clear()
-    asyncio.create_task(process_queue())
+
 # --- Main Application Entry Point ---
 
 async def main():
