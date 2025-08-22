@@ -9,40 +9,31 @@ import ffmpeg_wrap
 import asyncio
 import re
 
-# --- Configuration ---
-SERVER = "157.180.10.100"
+SERVER = "26cbca8d-e19a-483b-b99f-d8451f462e29"
 PORT = 3001
 USERNAME = "Stählampe"
 PASSWORD = ""
 CERTFILE = "testbot.pem"
 
-# --- Global State ---
 queue = []
 is_processing_queue = False
 is_playing = False
-looping = False  # New state for looping the queue
 stop_event = asyncio.Event()
 
-# --- Mumble Setup ---
 mumble = Mumble(SERVER, USERNAME, password=PASSWORD, port=PORT, certfile=CERTFILE, reconnect=True)
 
-# This will hold the main event loop
 loop = None
 
 currentusers = {}
 
-# --- Async Helper for Thread-Safe Greeting ---
 async def greet_user(username):
     """Asynchronously sends a welcome message."""
-    # This coroutine will be run safely on the main event loop
     stop_event.clear()
     await play_file(username + ".wav")
     mumble.channels[0].send_text_message(f"Hiya, {username}")
 
 async def chat_threadsfe(msg):
     mumble.channels[0].send_text_message(msg)
-
-# --- Synchronous Callbacks (from pymumble's thread) ---
 
 def process_text(data):
     """
@@ -51,11 +42,10 @@ def process_text(data):
     """
     global loop
     if not loop:
-        return # Don't process commands if the main loop isn't running yet
+        return
 
     if data.message.startswith("!"):
-        command_parts = data.message[1:].split()
-        command = command_parts[0]
+        command = data.message[1:].split()[0]
         
         match command:
             case "play":
@@ -64,7 +54,7 @@ def process_text(data):
                 asyncio.run_coroutine_threadsafe(play_immedeatly(query), loop)
 
             case "add":
-                mumble.channels[0].send_text_message("Added.")
+                mumble.channels[0].send_text_message("Processing...")
                 query = data.message[5:]
                 asyncio.run_coroutine_threadsafe(add_queue(query), loop)
 
@@ -82,52 +72,17 @@ def process_text(data):
                 asyncio.run_coroutine_threadsafe(skip_queue(), loop)
 
             case "list":
-                # Extract the 'data' part from each dictionary in the queue for display
-                display_queue = [item.get('data', 'Invalid Item') for item in queue]
-                mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(display_queue))
+                mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(item["data"] for item in queue))
+                #asyncio.run_coroutine_threadsafe(chat_threadsfe(str(queue)), loop)
 
             case "songs":
                 mumble.channels[0].send_text_message("<a href=\"https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html\">https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html</a>")
             
-            case "loop":
-                global looping
-                try:
-                    arg = command_parts[1].lower()
-                    if arg == "true":
-                        looping = True
-                        mumble.channels[0].send_text_message("Looping enabled.")
-                    elif arg == "false":
-                        looping = False
-                        mumble.channels[0].send_text_message("Looping disabled.")
-                    else:
-                        mumble.channels[0].send_text_message("Usage: !loop <true|false>")
-                except IndexError:
-                    # If no argument is provided, report the current state
-                    status = "enabled" if looping else "disabled"
-                    mumble.channels[0].send_text_message(f"Looping is currently {status}.")
-
             case "help":
-                message = (
-                    "<h1>Stehlampe -- Help</h1><br>"
-                    "<ul>"
-                    "<li><b>!play <i>query</i></b> -- Plays a song immediately, clearing the queue.</li>"
-                    "<li><b>!add <i>query</i></b> -- Adds a song to the queue.</li>"
-                    "<li><b>!url <i>URL</i></b> -- Plays a direct URL immediately.</li>"
-                    "<li><b>!stop</b> -- Stops playback and clears the queue.</li>"
-                    "<li><b>!skip</b> -- Skips the current song.</li>"
-                    "<li><b>!list</b> -- Shows the songs currently in the queue.</li>"
-                    "<li><b>!loop <i>true|false</i></b> -- Enables or disables playlist looping.</li>"
-                    "<li><b>!songs</b> -- Links to the Jellyfin library.</li>"
-                    "<li><b>!help</b> -- Shows this message.</li>"
-                    "</ul>"
-                )
+                message = f"<h1>Stehlampe -- Help</h1><br><ul><li>!play <i>query</i> -- Plays a song immediately.</li><li>!add <i>query</i> -- Adds a song to the queue.</li><li>!stop -- Stops playback and clears the queue.</li><li>!help -- Shows this message.</li></ul>"
                 mumble.channels[0].send_text_message(message)
 
 def process_join(data):
-    """
-    Handles user join events.
-    Runs in pymumble's background thread.
-    """
     global loop
     if not loop:
         return
@@ -141,28 +96,22 @@ def process_join(data):
         asyncio.run_coroutine_threadsafe(greet_user(username), loop)
 
 def process_leave(user, data):
-    """
-    Handles user leave events.
-    Runs in pymumble's background thread.
-    """
     try:
         session = user.get('session')
         if session and session in currentusers:
             currentusers.pop(session)
     except Exception as e:
-        print(f"Error in process_leave: {e}")
-
-# --- Asynchronous Playback Logic ---
+        print(f"[Main] Error in process_leave: {e}")
 
 async def play_file(file):
     global is_playing
     is_playing = True
-    print(f"Now playing: {file}")
+    print(f"[Player] Now playing: {file}")
     
     try:
         data, samplerate = sf.read(file, dtype="int16")
     except Exception as e:
-        print(f"Error reading audio file {file}: {e}")
+        print(f"[Player] Error reading audio file {file}: {e}")
         is_playing = False
         return
 
@@ -175,7 +124,7 @@ async def play_file(file):
             data = librosa.resample(data.astype(np.float32), orig_sr=samplerate, target_sr=48000)
             data = data.astype(np.int16)
         except ImportError:
-            print("librosa not installed. Could not resample audio.")
+            print("[Player] librosa not installed. Could not resample audio.")
             is_playing = False
             return
 
@@ -185,23 +134,23 @@ async def play_file(file):
 
     for i in range(0, len(pcm_bytes), chunk_size):
         if stop_event.is_set():
-            print("Playback stopped early.")
+            print("[Player] Playback stopped early.")
             break
         
         chunk = pcm_bytes[i:i+chunk_size]
         mumble.send_audio.add_sound(chunk)
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=seconds_per_iteration)
-            print("Playback stopped early during sleep.")
+            print("[Player] Playback stopped early during sleep.")
             break
         except asyncio.TimeoutError:
             pass
             
     is_playing = False
-    print("Finished playing audio.")
+    print("[Player] Finished playing audio.")
 
 async def play_query(query):
-    print(f"Processing query: {query}")
+    print(f"[Queryplay] Processing query: {query}")
     stop_event.clear()
 
     container, name_artist, url = jellyfin.query(query)
@@ -223,7 +172,7 @@ async def play_query(query):
         return "Error! Song not found!"
 
 async def play_url(url):
-    print(f"Processing url: {url}")
+    print(f"[URLplay] Processing url: {url}")
     url = re.sub(r'<[^>]+>', '', url)
     stop_event.clear()
 
@@ -245,66 +194,73 @@ async def play_url(url):
 
 async def add_queue(query):
     global queue, is_processing_queue
-    queue.append({"type": "query", "data": query})
-    if not is_processing_queue:
-        asyncio.create_task(process_queue())
+
+    query = re.sub(r'<[^>]+>', '', query)
+
+    if query.startswith("https://"):
+        queue.append({"type":"url","data":query})
+        mumble.channels[0].send_text_message("Added " + query + " to queue!")
+        if not is_processing_queue:
+            asyncio.create_task(process_queue())
+    else:
+        container, name, url = jellyfin.query(query)
+        if name != "":
+            queue.append({"type":"query","data":query})
+            mumble.channels[0].send_text_message("Added " + name + " to queue!")
+            if not is_processing_queue:
+                asyncio.create_task(process_queue())
+        else:
+            mumble.channels[0].send_text_message("Song not Found!")
 
 async def play_immedeatly(query):
     global queue
-    await stop_queue()
-    queue.insert(0, {"type": "query", "data": query})
+    await stop_queue_no_clear()
+    queue.insert(0, {"type":"query","data":query})
     asyncio.create_task(process_queue())
 
 async def play_url_immedeatly(url):
     global queue
-    await stop_queue()
-    queue.insert(0, {"type": "url", "data": url})
+    await stop_queue_no_clear()
+    queue.insert(0, {"type":"url","data":query})
     asyncio.create_task(process_queue())
 
 async def process_queue():
-    global queue, is_processing_queue, looping
+    global queue, is_processing_queue
     if is_processing_queue:
         return
     
     is_processing_queue = True
     while queue and is_processing_queue:
-        current_item = queue.pop(0)
-        
-        # If looping is enabled, add the item back to the end of the queue
-        if looping:
-            queue.append(current_item)
-
-        result = ""
-        item_type = current_item.get("type")
-        item_data = current_item.get("data")
-
-        if item_type == "query":
-            result = await play_query(item_data)
-        elif item_type == "url":
-            result = await play_url(item_data)
-        
-        if result:
-             mumble.channels[0].send_text_message(result)
-             # If song failed and we are looping, remove the re-added item
-             if looping:
-                 queue.pop()
+        current_query = queue.pop(0)
+        if current_query.get("type") == "query":
+            result = await play_query(current_query.get("data"))
+            if result:
+                mumble.channels[0].send_text_message(result)
+        elif current_query.get("type") == "url":
+            result = await play_url(current_query.get("data"))
+            if result:
+                mumble.channels[0].send_text_message(result)
 
     is_processing_queue = False
-    print("Queue finished.")
+    print("[Queue] Queue finished.")
 
 async def stop_queue():
-    global queue, is_processing_queue, is_playing, looping
+    global queue, is_processing_queue
     queue.clear()
     is_processing_queue = False
-    looping = False  # Also reset looping when stopping
+    stop_event.set()
+
+async def stop_queue_no_clear():
+    global is_processing_queue
+    is_processing_queue = False
     stop_event.set()
     
 async def skip_queue():
     global queue, is_processing_queue
-    # Simply stop the current song. The process_queue loop will continue.
+    is_processing_queue = False
     stop_event.set()
-
-# --- Main Application Entry Point ---
+    stop_event.clear()
+    asyncio.create_task(process_queue())
 
 async def main():
     global loop
@@ -317,13 +273,12 @@ async def main():
     
     while not mumble.is_ready():
         await asyncio.sleep(0.1)
-        
-    print("Startup complete. Bot is ready.")
     
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
     try:
+        print("Mumble Bot is running...")
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Shutting down.")
+        print("[Main] Shutting down.")
