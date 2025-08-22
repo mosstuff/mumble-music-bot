@@ -12,7 +12,7 @@ import re
 # --- Configuration ---
 SERVER = "157.180.10.100"
 PORT = 3001
-USERNAME = "stehendes Beleuchtungsinstrument"
+USERNAME = "Stählampe"
 PASSWORD = ""
 CERTFILE = "testbot.pem"
 
@@ -80,11 +80,12 @@ def process_text(data):
             case "skip":
                 mumble.channels[0].send_text_message("Skipped.")
                 asyncio.run_coroutine_threadsafe(skip_queue(), loop)
-            case "fckmuters":
-                mumble.channels[0].send_text_message("!accept")
+
             case "list":
-                mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(queue))
-    
+                # Extract the 'data' part from each dictionary in the queue for display
+                display_queue = [item.get('data', 'Invalid Item') for item in queue]
+                mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(display_queue))
+
             case "songs":
                 mumble.channels[0].send_text_message("<a href=\"https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html\">https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html</a>")
             
@@ -244,22 +245,21 @@ async def play_url(url):
 
 async def add_queue(query):
     global queue, is_processing_queue
-    queue.append(query)
+    queue.append({"type": "query", "data": query})
     if not is_processing_queue:
         asyncio.create_task(process_queue())
 
 async def play_immedeatly(query):
     global queue
     await stop_queue()
-    queue.insert(0, query)
+    queue.insert(0, {"type": "query", "data": query})
     asyncio.create_task(process_queue())
 
 async def play_url_immedeatly(url):
     global queue
     await stop_queue()
-    result = await play_url(url)
-    if result:
-            mumble.channels[0].send_text_message(result)
+    queue.insert(0, {"type": "url", "data": url})
+    asyncio.create_task(process_queue())
 
 async def process_queue():
     global queue, is_processing_queue, looping
@@ -268,19 +268,26 @@ async def process_queue():
     
     is_processing_queue = True
     while queue and is_processing_queue:
-        current_query = queue.pop(0)
+        current_item = queue.pop(0)
         
-        # If looping is enabled, add the song back to the end of the queue
+        # If looping is enabled, add the item back to the end of the queue
         if looping:
-            queue.append(current_query)
+            queue.append(current_item)
 
-        result = await play_query(current_query)
+        result = ""
+        item_type = current_item.get("type")
+        item_data = current_item.get("data")
+
+        if item_type == "query":
+            result = await play_query(item_data)
+        elif item_type == "url":
+            result = await play_url(item_data)
+        
         if result:
              mumble.channels[0].send_text_message(result)
-             # If song failed and we are looping, remove the re-added song
+             # If song failed and we are looping, remove the re-added item
              if looping:
                  queue.pop()
-
 
     is_processing_queue = False
     print("Queue finished.")
