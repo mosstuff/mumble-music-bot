@@ -16,7 +16,7 @@ async def convert_proper(file):
 async def make_intermission():
     print("[ffmpeg] Merging intermission...")
     ffmpeg.concat(
-        ffmpeg.input("intermission2.wav"),
+        ffmpeg.input("intermission3.wav"),
         ffmpeg.input("tts.wav"),
         v=0,
         a=1
