@@ -9,7 +9,7 @@ import ffmpeg_wrap
 import asyncio
 import re
 
-SERVER = "26cbca8d-e19a-483b-b99f-d8451f462e29"
+SERVER = "157.180.10.100"
 PORT = 3001
 USERNAME = "Stählampe"
 PASSWORD = ""
@@ -41,7 +41,7 @@ def process_text(data):
 
     if data.message.startswith("!"):
         command = data.message[1:].split()[0]
-        
+        command_parts = data.message[1:].split()
         match command:
             case "play":
                 mumble.channels[0].send_text_message("Playing.")
@@ -61,6 +61,22 @@ def process_text(data):
             case "stop":
                 asyncio.run_coroutine_threadsafe(stop_queue(), loop)
                 mumble.channels[0].send_text_message("Stopped.")
+            case "loop":
+                global looping
+                try:
+                    arg = command_parts[1].lower()
+                    if arg == "true":
+                        looping = True
+                        mumble.channels[0].send_text_message("Looping enabled.")
+                    elif arg == "false":
+                        looping = False
+                        mumble.channels[0].send_text_message("Looping disabled.")
+                    else:
+                        mumble.channels[0].send_text_message("Usage: !loop <true|false>")
+                except IndexError:
+                    # If no argument is provided, report the current state
+                    status = "enabled" if looping else "disabled"
+                    mumble.channels[0].send_text_message(f"Looping is currently {status}.")
 
             case "skip":
                 mumble.channels[0].send_text_message("Skipped.")
@@ -220,13 +236,17 @@ async def play_url_immedeatly(url):
     asyncio.create_task(process_queue())
 
 async def process_queue():
-    global queue, is_processing_queue
+    global queue, is_processing_queue, looping
     if is_processing_queue:
         return
     
     is_processing_queue = True
     while queue and is_processing_queue:
         current_query = queue.pop(0)
+        if looping:
+            queue.append(current_query)
+
+        
         if current_query.get("type") == "query":
             result = await play_query(current_query.get("data"))
             if result:
@@ -235,14 +255,17 @@ async def process_queue():
             result = await play_url(current_query.get("data"))
             if result:
                 mumble.channels[0].send_text_message(result)
+                if looping:
+                     queue.pop()
 
     is_processing_queue = False
     print("[Queue] Queue finished.")
 
 async def stop_queue():
-    global queue, is_processing_queue
+    global queue, is_processing_queue, is_playing, looping
     queue.clear()
     is_processing_queue = False
+    looping = False
     stop_event.set()
 
 async def stop_queue_no_clear():
