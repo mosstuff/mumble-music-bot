@@ -137,8 +137,9 @@ def process_join(data):
     
     if username and session:
         currentusers[session] = username
-        asyncio.run_coroutine_threadsafe(stop_queue(), loop)
+        asyncio.run_coroutine_threadsafe(stop_queue_no_clear(), loop)
         asyncio.run_coroutine_threadsafe(greet_user(username), loop)
+        asyncio.run_coroutine_threadsafe(process_queue(), loop)
 
 def process_leave(user, data):
     try:
