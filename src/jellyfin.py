@@ -40,7 +40,7 @@ async def get_playlist_ids(playlist_name):
             for item in result.items:
                 ids.append({"sid":item.id,"name_artist":item.name + " by " + ' ,'.join(item.artists)})
             print(ids)
-            return {"status": "","ids": ids} #success
+            return {"status": "Success!","ids": ids} #success
         else:
             return {"status": "Error: Playlist is private!","ids": []} #Playlist Private
     else:

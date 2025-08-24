@@ -8,6 +8,7 @@ import tts
 import ffmpeg_wrap
 import asyncio
 import re
+import random
 
 SERVER = ""
 PORT = 3001
@@ -62,6 +63,10 @@ def process_text(data):
                 mumble.channels[0].send_text_message("Added.")
                 url = data.message[5:]
                 asyncio.run_coroutine_threadsafe(play_url_immedeatly(url), loop)
+
+            case "shuffle":
+                random.shuffle(queue)
+                mumble.channels[0].send_text_message("Shuffeled.")
 
             case "stop":
                 asyncio.run_coroutine_threadsafe(stop_queue(), loop)
@@ -277,7 +282,6 @@ async def play_pl_immedeatly(query):
         print(ids.get("ids", []))
         for id in ids.get("ids", []):
             queue.append({"type":"query","data":id})
-            mumble.channels[0].send_text_message("Added: " + id.get("name_artist"))
     else:
         mumble.channels[0].send_text_message("Error: Playlist empty!")
     mumble.channels[0].send_text_message(ids.get("status"))
