@@ -58,6 +58,11 @@ def process_text(data):
                 query = data.message[7:]
                 asyncio.run_coroutine_threadsafe(play_pl_immedeatly(query), loop)
 
+            case "plists":
+                mumble.channels[0].send_text_message("Processing...")
+                query = data.message[8:]
+                asyncio.run_coroutine_threadsafe(play_pl_immedeatly_s(query), loop)
+
             case "url":
                 mumble.channels[0].send_text_message("Added.")
                 url = data.message[5:]
@@ -132,8 +137,9 @@ def process_join(data):
     
     if username and session:
         currentusers[session] = username
-        asyncio.run_coroutine_threadsafe(stop_queue(), loop)
+        asyncio.run_coroutine_threadsafe(stop_queue_no_clear(), loop)
         asyncio.run_coroutine_threadsafe(greet_user(username), loop)
+        asyncio.run_coroutine_threadsafe(process_queue(), loop)
 
 def process_leave(user, data):
     try:
@@ -280,6 +286,20 @@ async def play_pl_immedeatly(query):
     else:
         mumble.channels[0].send_text_message("Error: Playlist empty!")
     mumble.channels[0].send_text_message(ids.get("status"))
+    asyncio.create_task(process_queue())
+
+async def play_pl_immedeatly_s(query):
+    global queue
+    await stop_queue()
+    ids = await jellyfin.get_playlist_ids(query)
+    if len(ids.get("ids", [])) > 0:
+        print(ids.get("ids", []))
+        for id in ids.get("ids", []):
+            queue.append({"type":"query","data":id})
+    else:
+        mumble.channels[0].send_text_message("Error: Playlist empty!")
+    mumble.channels[0].send_text_message(ids.get("status"))
+    random.shuffle(queue)
     asyncio.create_task(process_queue())
 
 async def process_queue():
