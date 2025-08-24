@@ -1,28 +1,51 @@
-from jellyfin_apiclient_python import JellyfinClient
+from jellyfinapi.jellyfinapi_client import JellyfinapiClient
+from jellyfinapi.configuration import Environment
+from jellyfinapi.models.base_item_kind_enum import BaseItemKindEnum
 import ffmpeg
 import aiohttp
 import asyncio
 import ffmpeg_wrap
 
-def query(Name):
-    print("[Jellyfin] Quering: " + Name)
-    client = JellyfinClient()
-    client.config.app('music-bot', '0.0.1', 'scary_big_nasa_compuper', 'ghdfjklhhdfghklfghnijophrsthijkophtrsopihjdfgh')
-    client.config.data["auth.ssl"] = True
-    client.auth.connect_to_address('https://crapflix.mosstuff.de/https://crapflix.mosstuff.de')
-    client.auth.login('https://crapflix.mosstuff.de/https://crapflix.mosstuff.de', 'music-bot', 'musik')
-    result = client.jellyfin.search_media_items(term=Name, media="Music")
-    #print(result)
-    if len(result["Items"]) >= 1:
-        id = result["Items"][0]["Id"]
-        container = result["Items"][0]["Container"]
-        name_artist = result["Items"][0]["Name"] + " by " + ' ,'.join(result["Items"][0]["Artists"])
-        url = client.jellyfin.audio_url(id,container)
-        print("[Jellyfin] Found: " + name_artist + ".")
-        return container, name_artist, url
-    else:
-        return("","","")
+api_key = 'b073dc653eb044beae6c4b9ecdfbb7c6'
 
+client = JellyfinapiClient(
+    x_emby_token=api_key,
+    server_url="https://crapflix.mosstuff.de"
+    )
+
+def query(query):
+     print("[Jellyfin] Quering: " + query)
+     search_controller = client.search
+     result =search_controller.get(search_term=query,include_item_types=BaseItemKindEnum.AUDIO)
+     if len(result.search_hints) > 0:
+        name_artist = result.search_hints[0].name + " by " + ' ,'.join(result.search_hints[0].artists)
+        return result.search_hints[0].item_id, name_artist
+        #return "bin",name_artist,"https://crapflix.mosstuff.de/Items/" + result.search_hints[0].item_id + "/Download?api_key=" + api_key
+     else:
+        return "",""
+
+async def get_playlist_ids(playlist_name):
+    print("[Jellyfin] Querying playlist:", playlist_name)
+    search_controller = client.search
+    result = search_controller.get(search_term=playlist_name,include_item_types=BaseItemKindEnum.PLAYLIST)
+    if len(result.search_hints) > 0:
+        pl_id = result.search_hints[0].item_id
+        playlists_controller = client.playlists
+        try:
+            result = playlists_controller.get_playlist_items(pl_id, "d9a1b273dc5443d4a166579b33be99b2")
+        except:
+            result = ""
+        ids = []
+        if result != "":
+            for item in result.items:
+                ids.append({"sid":item.id,"name_artist":item.name + " by " + ' ,'.join(item.artists)})
+            print(ids)
+            return {"status": "","ids": ids} #success
+        else:
+            return {"status": "Error: Playlist is private!","ids": []} #Playlist Private
+    else:
+        return {"status": "Error: Playlist not found!","ids": []} #Not Found
+    
 
 async def download(url, container):
     async with aiohttp.ClientSession() as session:
@@ -43,3 +66,7 @@ async def download_music_and_convert(url, container):
     print("[DnC] Downloaded. Started conversion to WAV.")
     await ffmpeg_wrap.convert_proper(file)
     print("[DnC] Finished converting. Music ready.")
+
+async def download_id_and_convert(id):
+    print("[IDnC] Prepping URL for: " + id)
+    await download_music_and_convert("https://crapflix.mosstuff.de/Items/" + id + "/Download?api_key=" + api_key, "bin")

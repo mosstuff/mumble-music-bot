@@ -9,7 +9,7 @@ import ffmpeg_wrap
 import asyncio
 import re
 
-SERVER = "26cbca8d-e19a-483b-b99f-d8451f462e29"
+SERVER = "157.180.10.100"
 PORT = 3001
 USERNAME = "Stählampe"
 PASSWORD = ""
@@ -53,6 +53,11 @@ def process_text(data):
                 query = data.message[5:]
                 asyncio.run_coroutine_threadsafe(add_queue(query), loop)
 
+            case "plist":
+                mumble.channels[0].send_text_message("Processing...")
+                query = data.message[7:]
+                asyncio.run_coroutine_threadsafe(play_pl_immedeatly(query), loop)
+
             case "url":
                 mumble.channels[0].send_text_message("Added.")
                 url = data.message[5:]
@@ -83,7 +88,31 @@ def process_text(data):
                 asyncio.run_coroutine_threadsafe(skip_queue(), loop)
 
             case "list":
-                mumble.channels[0].send_text_message("Songs in current queue: " + ', '.join(item["data"] for item in queue))
+                songs = []
+                for item in queue:
+                    if item.get("type") == "query":
+                        songs.append(item.get("data").get("name_artist"))
+                    elif item.get("type") == "url":
+                        songs.append(item.get("data"))
+                message = "<h2>Songs in current queue:</h2><br><ul><li>" + '</li><li>'.join(item for item in songs) + '</li></ul>'
+                song_items = message.split('</li><li>')
+                chunks = []
+                chunk_size = 5000
+                current_chunk = "<ul><li>"
+
+                for song in song_items:
+                    if len(current_chunk) + len(song) + len('</li><li>') > chunk_size:
+                        current_chunk += "</li></ul>"
+                        chunks.append(current_chunk)
+                        current_chunk = "<ul><li>" + song
+                    else:
+                        current_chunk += "</li><li>" + song
+
+                if current_chunk:
+                    current_chunk += "</li></ul>"
+                    chunks.append(current_chunk)
+                for chunk in chunks:
+                    mumble.channels[0].send_text_message(chunk)
                 #asyncio.run_coroutine_threadsafe(chat_threadsfe(str(queue)), loop)
 
             case "songs":
@@ -160,17 +189,18 @@ async def play_file(file):
     is_playing = False
     print("[Player] Finished playing audio.")
 
-async def play_query(query):
-    print(f"[Queryplay] Processing query: {query}")
+async def play_id(song):
+    print(song)
     stop_event.clear()
+    sid = song.get("sid")
+    name_artist = song.get("name_artist")
+    print(f"[IDplay] Processing ID: {sid}")
 
-    container, name_artist, url = jellyfin.query(query)
-
-    if url.startswith("https://"):
+    if sid != "" or sid != None:
         await tts.say_thing(f"Now playing: {name_artist}!")
         await ffmpeg_wrap.make_intermission()
         
-        download_task = asyncio.create_task(jellyfin.download_music_and_convert(url, container))
+        download_task = asyncio.create_task(jellyfin.download_id_and_convert(sid))
         
         await play_file("c_intermission.wav")
         
@@ -180,7 +210,7 @@ async def play_query(query):
             await play_file("c_convert.wav")
         return ""
     else:
-        return "Error! Song not found!"
+        return "Error!"
 
 async def play_url(url):
     print(f"[URLplay] Processing url: {url}")
@@ -188,7 +218,7 @@ async def play_url(url):
     stop_event.clear()
 
     if url.startswith("https://"):
-        await tts.say_thing(f"Now playing: {url}!")
+        await tts.say_thing(f"Now playing a custom URL!")
         await ffmpeg_wrap.make_intermission()
         
         download_task = asyncio.create_task(jellyfin.download_music_and_convert(url, "mp3"))
@@ -214,10 +244,10 @@ async def add_queue(query):
         if not is_processing_queue:
             asyncio.create_task(process_queue())
     else:
-        container, name, url = jellyfin.query(query)
-        if name != "":
-            queue.append({"type":"query","data":query})
-            mumble.channels[0].send_text_message("Added " + name + " to queue!")
+        sid, name_artist = jellyfin.query(query)
+        if sid != "":
+            queue.append({"type":"query","data":{"sid":sid,"name_artist":name_artist}})
+            mumble.channels[0].send_text_message("Added " + name_artist + " to queue!")
             if not is_processing_queue:
                 asyncio.create_task(process_queue())
         else:
@@ -226,13 +256,31 @@ async def add_queue(query):
 async def play_immedeatly(query):
     global queue
     await stop_queue_no_clear()
-    queue.insert(0, {"type":"query","data":query})
+    sid, name_artist = jellyfin.query(query)
+    if sid != "":
+        queue.insert(0, {"type":"query","data":{"sid":sid,"name_artist":name_artist}})
+    else:
+        mumble.channels[0].send_text_message("Song not Found!")
     asyncio.create_task(process_queue())
 
 async def play_url_immedeatly(url):
     global queue
     await stop_queue_no_clear()
     queue.insert(0, {"type":"url","data":url})
+    asyncio.create_task(process_queue())
+
+async def play_pl_immedeatly(query):
+    global queue
+    await stop_queue()
+    ids = await jellyfin.get_playlist_ids(query)
+    if len(ids.get("ids", [])) > 0:
+        print(ids.get("ids", []))
+        for id in ids.get("ids", []):
+            queue.append({"type":"query","data":id})
+            mumble.channels[0].send_text_message("Added: " + id.get("name_artist"))
+    else:
+        mumble.channels[0].send_text_message("Error: Playlist empty!")
+    mumble.channels[0].send_text_message(ids.get("status"))
     asyncio.create_task(process_queue())
 
 async def process_queue():
@@ -245,10 +293,9 @@ async def process_queue():
         current_query = queue.pop(0)
         if looping:
             queue.append(current_query)
-
         
         if current_query.get("type") == "query":
-            result = await play_query(current_query.get("data"))
+            result = await play_id(current_query.get("data"))
             if result:
                 mumble.channels[0].send_text_message(result)
         elif current_query.get("type") == "url":
