@@ -4,3 +4,7 @@
 ./current.mp3
 ./testbot.pem
 ./src/test.py
+./c_convert.wav
+./c_intermission.wav
+./jellyfin.bin
+./tts.wav
