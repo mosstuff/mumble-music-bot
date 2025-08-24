@@ -42,7 +42,6 @@ def process_text(data):
 
     if data.message.startswith("!"):
         command = data.message[1:].split()[0]
-        command_parts = data.message[1:].split()
         match command:
             case "play":
                 mumble.channels[0].send_text_message("Playing.")
@@ -71,20 +70,17 @@ def process_text(data):
             case "stop":
                 asyncio.run_coroutine_threadsafe(stop_queue(), loop)
                 mumble.channels[0].send_text_message("Stopped.")
+
             case "loop":
                 global looping
-                try:
-                    arg = command_parts[1].lower()
-                    if arg == "true":
-                        looping = True
-                        mumble.channels[0].send_text_message("Looping enabled.")
-                    elif arg == "false":
-                        looping = False
-                        mumble.channels[0].send_text_message("Looping disabled.")
-                    else:
-                        mumble.channels[0].send_text_message("Usage: !loop <true|false>")
-                except IndexError:
-                    # If no argument is provided, report the current state
+                arg = data.message[6:]
+                if arg == "true":
+                    looping = True
+                    mumble.channels[0].send_text_message("Looping enabled.")
+                elif arg == "false":
+                    looping = False
+                    mumble.channels[0].send_text_message("Looping disabled.")
+                else:
                     status = "enabled" if looping else "disabled"
                     mumble.channels[0].send_text_message(f"Looping is currently {status}.")
 
@@ -99,11 +95,11 @@ def process_text(data):
                         songs.append(item.get("data").get("name_artist"))
                     elif item.get("type") == "url":
                         songs.append(item.get("data"))
-                message = "<h2>Songs in current queue:</h2><br><ul><li>" + '</li><li>'.join(item for item in songs) + '</li></ul>'
+                message = "<ul><li>" + '</li><li>'.join(item for item in songs) + '</li></ul>'
                 song_items = message.split('</li><li>')
                 chunks = []
                 chunk_size = 5000
-                current_chunk = "<ul><li>"
+                current_chunk = "<h2>Songs in current queue:</h2><br><ul><li>"
 
                 for song in song_items:
                     if len(current_chunk) + len(song) + len('</li><li>') > chunk_size:
@@ -118,13 +114,12 @@ def process_text(data):
                     chunks.append(current_chunk)
                 for chunk in chunks:
                     mumble.channels[0].send_text_message(chunk)
-                #asyncio.run_coroutine_threadsafe(chat_threadsfe(str(queue)), loop)
 
             case "songs":
-                mumble.channels[0].send_text_message("<a href=\"https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html\">https://crapflix.mosstuff.de/https://crapflix.mosstuff.de/web/#/music.html</a>")
+                mumble.channels[0].send_text_message("<a href=\"https://crapflix.mosstuff.de/web/#/music.html\">https://crapflix.mosstuff.de/web/#/music.html</a>")
             
             case "help":
-                message = f"<h1>Stehlampe -- Help</h1><br><ul><li>!play <i>query</i> -- Plays a song immediately.</li><li>!add <i>query</i> -- Adds a song to the queue.</li><li>!stop -- Stops playback and clears the queue.</li><li>!help -- Shows this message.</li></ul>"
+                message = f"<h1>Stehlampe -- Help</h1><br><ul><li><strong>!play &lt;query></strong> -- Plays a song immediately based on your query.<li><strong>!add &lt;query></strong> -- Adds a song to the queue for later playback.<li><strong>!plist &lt;query></strong> -- Plays a playlist immediately.<li><strong>!url &lt;url></strong> -- Adds a URL to the queue and plays it.<li><strong>!shuffle</strong> -- Shuffles the current song queue.<li><strong>!stop</strong> -- Stops playback and clears the entire queue.<li><strong>!skip</strong> -- Skips the current song in the queue.<li><strong>!loop &lt;true/false></strong> -- Toggles looping of the queue (currently <em>enabled</em> or <em>disabled</em>).<li><strong>!list</strong> -- Displays the songs in the current queue.<li><strong>!songs</strong> -- Provides a link to the music catalog.<li><strong>!help</strong> -- Shows this help message.</ul>"
                 mumble.channels[0].send_text_message(message)
 
 def process_join(data):
