@@ -6,7 +6,7 @@ import aiohttp
 import asyncio
 import ffmpeg_wrap
 
-api_key = 'b073dc653eb044beae6c4b9ecdfbb7c6'
+api_key = ''
 
 client = JellyfinapiClient(
     x_emby_token=api_key,
