@@ -9,7 +9,7 @@ import ffmpeg_wrap
 import asyncio
 import re
 
-SERVER = "157.180.10.100"
+SERVER = ""
 PORT = 3001
 USERNAME = "Stählampe"
 PASSWORD = ""
