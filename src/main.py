@@ -23,7 +23,7 @@ stop_event = asyncio.Event()
 
 mumble = Mumble(SERVER, USERNAME, password=PASSWORD, port=PORT, certfile=CERTFILE, reconnect=True)
 
-loop = None
+loop = False
 
 currentusers = {}
 
