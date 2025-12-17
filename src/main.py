@@ -23,7 +23,8 @@ stop_event = asyncio.Event()
 
 mumble = Mumble(SERVER, USERNAME, password=PASSWORD, port=PORT, certfile=CERTFILE, reconnect=True)
 
-loop = False
+loop = None
+looping = False
 
 currentusers = {}
 
@@ -154,6 +155,7 @@ def process_leave(user, data):
 async def play_file(file):
     global is_playing
     is_playing = True
+    stop_event.clear()
     print(f"[Player] Now playing: {file}")
     
     try:
