@@ -122,6 +122,9 @@ def process_text(data):
 
             case "songs":
                 mumble.channels[0].send_text_message("<a href=\"https://crapflix.mosstuff.de/web/#/music.html\">https://crapflix.mosstuff.de/web/#/music.html</a>")
+
+            case "catello":
+                asyncio.run_coroutine_threadsafe(play_file("catello.wav"), loop)
             
             case "help":
                 message = f"<h1>Stehlampe -- Help</h1><br><ul><li><strong>!play &lt;query></strong> -- Plays a song immediately based on your query.<li><strong>!add &lt;query></strong> -- Adds a song to the queue for later playback.<li><strong>!plist &lt;query></strong> -- Plays a playlist immediately.<li><strong>!url &lt;url></strong> -- Adds a URL to the queue and plays it.<li><strong>!shuffle</strong> -- Shuffles the current song queue.<li><strong>!stop</strong> -- Stops playback and clears the entire queue.<li><strong>!skip</strong> -- Skips the current song in the queue.<li><strong>!loop &lt;true/false></strong> -- Toggles looping of the queue (currently <em>enabled</em> or <em>disabled</em>).<li><strong>!list</strong> -- Displays the songs in the current queue.<li><strong>!songs</strong> -- Provides a link to the music catalog.<li><strong>!help</strong> -- Shows this help message.</ul>"
